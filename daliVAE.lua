@@ -8,13 +8,27 @@ require 'lfs'
 hasCudnn, cudnn = pcall(require, 'cudnn')
 assert(hasCudnn)
 
+local argparse = require 'argparse'
+local parser = argparse('oneira art', 'dream up images from your favorite artist')
+parser:option('-i --input', 'input directory for image dataset')
+parser:option('-o --output', 'output directory for generated images')
+parser:option('-s --size', 'size of dataset')
+parser:option('-c --checkpoints', 'directory for saving checkpoints')
+
+args = parser:parse()
+
+input = args.input
+output_folder = args.output
+dataset_size = args.size
+checkpoints = args.checkpoints
+
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(1)
 
-function getDali()
+function getFilenames()
     queue = {}
     count = 1
-    for file in lfs.dir('dali') do
+    for file in lfs.dir(input) do
         if file ~= '.' and file ~= '..' then
             queue[count] = file
             count = count + 1
@@ -34,7 +48,6 @@ function getNumber(num)
 end
 
 train_size = 100
-dataset_size = 323
 batch_size = 50
 channels = 3
 dim = 128
@@ -43,9 +56,9 @@ train = torch.Tensor(train_size, channels, dim, dim)
 train = train:cuda()
 
 function fillTensor(tensor)
-  filenames = getDali()
+  filenames = getFilenames()
   for i = 1, train_size do
-    tensor[i] = image.load('dali/' .. filenames[torch.random(1, dataset_size)])
+    tensor[i] = image.load(input .. filenames[torch.random(1, dataset_size)])
   end
   return tensor
 end
@@ -65,10 +78,10 @@ function weights_init(m)
    end
 end
 
-z_dim = 600
+z_dim = 200
 ndf = 64
-ngf = 80
-naf = 80
+ngf = 64
+naf = 64
 
 encoder = nn.Sequential()
 encoder:add(nn.SpatialConvolution(channels, naf, 4, 4, 2, 2, 1, 1))
@@ -107,7 +120,6 @@ samplerInternal:add(nn.Identity())
 samplerInternal:add(noiseModule)
 sampler:add(samplerInternal)
 sampler:add(nn.CAddTable())
-
 
 decoder = nn.Sequential()
 decoder:add(nn.SpatialFullConvolution(z_dim, ngf * 16, 4, 4))
@@ -165,13 +177,13 @@ optimStateG = {
 }
 
 optimStateD = {
-   learningRate = 0.00002,
+   learningRate = 0.0002,
    optimize = true
 }
 
 noise_x = torch.Tensor(batch_size, z_dim, 1, 1)
 noise_x = noise_x:cuda()
-noise_x:normal(0, 0.01)
+noise_x:normal(0, 1)
 label = torch.Tensor(batch_size)
 
 label = label:cuda()
@@ -204,7 +216,7 @@ fDx = function(x)
     if (errG < 0.7 and errD > 0.7) then netD:backward(input_x, df_do) end
 
     -- train with fake
-    noise_x:normal(0, 0.01)
+    noise_x:normal(0, 1)
     fake = decoder:forward(noise_x)
     --input_x:copy(fake)
     label:fill(fake_label)
@@ -255,9 +267,9 @@ fGx = function(x)
 end
 
 generate = function(epoch)
-    noise_x:normal(0, 0.01)
+    noise_x:normal(0, 1)
     local generations = decoder:forward(noise_x)
-    image.save('dali_generated/' .. getNumber(epoch) .. '.png', generations[1])
+    image.save(output_folder .. getNumber(epoch) .. '.png', generations[1])
 end
 
 require 'optim'
@@ -282,11 +294,11 @@ for epoch = 1, 50000 do
     parametersD, gradParametersD = nil, nil -- nil them to avoid spiking memory
     parametersG, gradParametersG = nil, nil
     if epoch % 1000 == 0 then
-        torch.save('dali_checkpoints/dali' .. epoch .. '_net_G.t7', netG:clearState())
-        torch.save('dali_checkpoints/dali' .. epoch .. '_net_D.t7', netD:clearState())
-        torch.save('dali_checkpoints/dali'  .. epoch .. 'encoder.t7', encoder:clearState())
-        torch.save('dali_checkpoints/dali'.. epoch .. 'decoder.t7', decoder:clearState())
-        torch.save('dali_checkpoints/dali' .. epoch .. 'sampler.t7', sampler:clearState())
+        torch.save(checkpoints .. epoch .. '_net_G.t7', netG:clearState())
+        torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
+        torch.save(checkpoints .. epoch .. 'encoder.t7', encoder:clearState())
+        torch.save(checkpoints .. epoch .. 'decoder.t7', decoder:clearState())
+        torch.save(checkpoints .. epoch .. 'sampler.t7', sampler:clearState())
     else
         netG:clearState()
         netD:clearState()
