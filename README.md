@@ -1,4 +1,3 @@
-# dcgan_vae_torch
-An implementation of the deep convolutional generative adversarial network, combined with a varational autoencoder on top. 
+# Deep Convolutional Variational Autoencoder w/ Adversarial Network
 
-Mostly for demonstrative purposes, but I will be making this code available for general use on any dataset. 
+A combination of the DCGAN implementation and the variational autoencoder. Currently, the model is set up to upsample and downsample 128x128 color images, with three color channels. The code can, however, be easily modified to accept any number of different dimensions or color channel combinations. I may modify the script to allow for this to be automated, depending on the level of interest.  
