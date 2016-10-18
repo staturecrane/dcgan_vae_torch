@@ -13,7 +13,8 @@ A combination of the DCGAN implementation and the variational autoencoder. Curre
 
 To run as a variational autoencoder, simply execute the script using 
 
-``` th daliVAE.lua -i [input folder destination] -o [output folder destination] -s [size of dataset (number of image files)] -c [destination for saving model checkpoints]
+``` 
+th daliVAE.lua -i [input folder destination] -o [output folder destination] -s [size of dataset (number of image files)] -c [destination for saving model checkpoints]
 ```
 
 where the input folder is expected to contain 128x128 color images. Output folder will be for generated samples from the model, although if you want to reconstruct test samples, this can be done by adding a test tensor and running it through a forward pass on the model. 
