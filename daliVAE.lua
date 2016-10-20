@@ -50,7 +50,7 @@ function getNumber(num)
 end
 
 train_size = 100
-batch_size = 10
+batch_size = 50
 channels = 3
 dim = 128
 
@@ -80,10 +80,10 @@ function weights_init(m)
    end
 end
 
-z_dim = 1000
+z_dim = 400
 ndf = 100
-ngf = 100
-naf = 100
+ngf = 80
+naf = 80
 
 encoder = VAE.get_encoder(channels, naf, z_dim)
 sampler = VAE.get_sampler()
@@ -110,7 +110,7 @@ m_criterion = nn.MSECriterion()
 m_criterion = m_criterion:cuda()
 
 optimStateG = {
-   learningRate = 0.000002,
+   learningRate =  0.00002,
    optimize = true
 }
 
@@ -232,10 +232,7 @@ for epoch = 1, 50000 do
     parametersG, gradParametersG = nil, nil
     if epoch % 1000 == 0 then
         torch.save(checkpoints .. epoch .. '_net_G.t7', netG:clearState())
-        torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
-        torch.save(checkpoints .. epoch .. 'encoder.t7', encoder:clearState())
-        torch.save(checkpoints .. epoch .. 'decoder.t7', decoder:clearState())
-        torch.save(checkpoints .. epoch .. 'sampler.t7', sampler:clearState())
+       -- torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
     else
         netG:clearState()
         --netD:clearState()
