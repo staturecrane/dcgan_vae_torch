@@ -5,7 +5,7 @@ require 'dpnn'
 require 'optim'
 require 'lfs'
 local VAE = require 'VAE'
-require 'discriminator'
+local discriminator = require 'discriminator'
 
 hasCudnn, cudnn = pcall(require, 'cudnn')
 assert(hasCudnn)
@@ -81,7 +81,7 @@ function weights_init(m)
 end
 
 z_dim = 400
-ndf = 100
+ndf = 32
 ngf = 80
 naf = 80
 
@@ -95,13 +95,13 @@ netG:add(sampler)
 netG:add(decoder)
 netG:apply(weights_init)
 
---netD = discriminator.get_discriminator(channels, ndf)
---netD:apply(weights_init)
+netD = discriminator.get_discriminator(channels, ndf)
+netD:apply(weights_init)
 
 netG = netG:cuda()
---netD = netD:cuda()
+netD = netD:cuda()
 cudnn.convert(netG, cudnn)
---cudnn.convert(netD, cudnn)
+cudnn.convert(netD, cudnn)
 
 criterion = nn.BCECriterion()
 criterion = criterion:cuda()
@@ -111,20 +111,22 @@ m_criterion = m_criterion:cuda()
 
 optimStateG = {
    learningRate =  0.00002,
-   optimize = true
+   beta1 = 0.5
 }
 
 optimStateD = {
-   learningRate = 0.000002,
-   optimize = true
+   learningRate = 0.00002,
+   beta1 = 0.5
 }
 
 noise_x = torch.Tensor(batch_size, z_dim, 1, 1)
 noise_x = noise_x:cuda()
 noise_x:normal(0, 0.01)
---label = torch.Tensor(batch_size)
+label = torch.Tensor(batch_size)
 
---label = label:cuda()
+dNoise = nn.WhiteNoise(0, 0.5):cuda()
+
+label = label:cuda()
 
 real_label = 1
 fake_label = 0
@@ -133,7 +135,7 @@ epoch_tm = torch.Timer()
 tm = torch.Timer()
 data_tm = torch.Timer()
 
---parametersD, gradParametersD = netD:getParameters()
+parametersD, gradParametersD = netD:getParameters()
 parametersG, gradParametersG = netG:getParameters()
 
 errD = 0
@@ -148,6 +150,7 @@ fDx = function(x)
     gradParametersD:zero()
     -- train with real
     label:fill(real_label)
+    input_x = dNoise:forward(input_x)
     output = netD:forward(input_x)
     errD_real = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
@@ -164,7 +167,7 @@ fDx = function(x)
     if (errD > 0.7 and errG < 0.7) then netD:backward(fake, df_do) end
 
     errD = errD_real + errD_fake
-
+    gradParametersD:clamp(-5, 5)
     return errD, gradParametersD
 end
 
@@ -199,7 +202,8 @@ fGx = function(x)
     errG = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
     df_dg = netD:updateGradInput(input_x, df_do)
-    if (errG > 0.7 and errD > 0.7) then decoder:backward(noise_x, df_dg) end
+    if (errG > 0.7) then decoder:backward(noise_x, df_dg) end
+    gradParametersG:clamp(-5, 5)
     return errG, gradParametersG
 end
 
@@ -219,27 +223,27 @@ for epoch = 1, 50000 do
         input_x = train:narrow(1, size, batch_size)
         tm:reset()
 
-        --optim.adam(fDx, parametersD, optimStateD)
+        optim.adam(fDx, parametersD, optimStateD)
         optim.adam(fAx, parametersG, optimStateG)
-        --optim.adam(fGx, parametersG, optimStateG)
+        optim.adam(fGx, parametersG, optimStateG)
         collectgarbage('collect')
     end
     if errG then
       print("Generator loss: " .. errG .. ", Autoencoder loss: " .. errA .. ", Discriminator loss: " .. errD)
       else print("Discriminator loss: " .. errD)
     end
-    --parametersD, gradParametersD = nil, nil
+    parametersD, gradParametersD = nil, nil
     parametersG, gradParametersG = nil, nil
     if epoch % 1000 == 0 then
         torch.save(checkpoints .. epoch .. '_net_G.t7', netG:clearState())
-       -- torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
+        torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
     else
         netG:clearState()
-        --netD:clearState()
+        netD:clearState()
     end
     generate(epoch)
     train = fillTensor(train)
-    --parametersD, gradParametersD = netD:getParameters()
+    parametersD, gradParametersD = netD:getParameters()
     parametersG, gradParametersG = netG:getParameters()
     print(('End of epoch %d / %d \t Time Taken: %.3f'):format(
            epoch, 10000, epoch_tm:time().real))
