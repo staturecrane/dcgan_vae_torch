@@ -1,4 +1,5 @@
-# Deep Convolutional Variational Autoencoder w/ Adversarial Network
+
+To# Deep Convolutional Variational Autoencoder w/ Adversarial Network
 
 A combination of the Torch [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the Torch [variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin. Also used is the [KLD criterion](https://github.com/y0ast/VAE-Torch) by y0ast. Currently, the model is set up to upsample and downsample 128x128 color images, with three color channels. The code can, however, be easily modified to accept any number of different dimensions or color channel combinations. I may modify the script to allow for this to be automated, depending on the level of interest.  
 
@@ -20,3 +21,5 @@ th daliVAE.lua -i [input folder destination] -o [output folder destination] -s [
 ```
 
 where the input folder is expected to contain 128x128 color images. The model resamples the training set after every epoch so as to fit on a GPU, and still get a wide breadth of samples. Output folder is for generated samples from the model, although if you want to reconstruct test samples, this can be done by adding a test tensor and running it through a forward pass on the model. 
+
+To run as a vanilla variational autoencoder, all you have to do is comment out any line that references "discriminator" and "netD", and the "optim.adam" functions in the main loop that reference "fDX" and "fGx". 
