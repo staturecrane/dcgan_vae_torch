@@ -188,12 +188,14 @@ fAx = function(x)
     if x ~= parametersG then
         parametersG:copy(x)
     end
+    --reconstruction loss
     gradParametersG:zero()
     output = netG:forward(input_x)
     errA = m_criterion:forward(output, input_x)
     df_do = m_criterion:backward(output, input_x)
     netG:backward(input_x, df_do)
 
+    --KLLoss
     nElements = output:nElement()
     mean, log_var = table.unpack(encoder.output)
     var = torch.exp(log_var)
@@ -203,7 +205,10 @@ fAx = function(x)
     gradKLLoss = {mean / nElements, 0.5*(var - 1) / nElements}
     encoder:backward(input_x, gradKLLoss)
     if reconstruct_count % 10 == 0 then
-      image.save(reconstruct_folder .. 'reconstruction' .. getNumber(reconstruct_count) .. '.png', output[1]) end
+      if reconstruct_folder then
+        image.save(reconstruct_folder .. 'reconstruction' .. getNumber(reconstruct_count) .. '.png', output[1])
+      end
+    end
     return errA, gradParametersG
 end
 
