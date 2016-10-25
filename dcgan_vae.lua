@@ -16,6 +16,7 @@ parser:option('-i --input', 'input directory for image dataset')
 parser:option('-o --output', 'output directory for generated images')
 parser:option('-s --size', 'size of dataset')
 parser:option('-c --checkpoints', 'directory for saving checkpoints')
+parser:option('-r --reconstruction', 'directory to put samples of reconstructions')
 
 args = parser:parse()
 
@@ -23,6 +24,7 @@ input = args.input
 output_folder = args.output
 dataset_size = args.size
 checkpoints = args.checkpoints
+reconstruct_folder = args.reconstruction
 
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(1)
@@ -80,10 +82,10 @@ function weights_init(m)
    end
 end
 
-z_dim = 400
-ndf = 32
-ngf = 80
-naf = 80
+z_dim = 100
+ndf = 64
+ngf = 64
+naf = 64
 
 encoder = VAE.get_encoder(channels, naf, z_dim)
 sampler = VAE.get_sampler()
@@ -115,7 +117,7 @@ optimStateG = {
 }
 
 optimStateD = {
-   learningRate = 0.00002,
+   learningRate = 0.000002,
    beta1 = 0.5
 }
 
@@ -124,7 +126,7 @@ noise_x = noise_x:cuda()
 noise_x:normal(0, 0.01)
 label = torch.Tensor(batch_size)
 
-dNoise = nn.WhiteNoise(0, 0.5):cuda()
+dNoise = nn.WhiteNoise(0, 0.1):cuda()
 
 label = label:cuda()
 
@@ -134,6 +136,8 @@ fake_label = 0
 epoch_tm = torch.Timer()
 tm = torch.Timer()
 data_tm = torch.Timer()
+
+reconstruct_count = 1
 
 parametersD, gradParametersD = netD:getParameters()
 parametersG, gradParametersG = netG:getParameters()
@@ -189,6 +193,8 @@ fAx = function(x)
     errA = errA + KLLoss
     gradKLLoss = {mean / nElements, 0.5*(var - 1) / nElements}
     encoder:backward(input_x, gradKLLoss)
+    if reconstruct_count % 10 == 0 then
+      image.save(reconstruct_folder .. 'reconstruction' .. getNumber(reconstruct_count) .. '.png', output[1]) end
     return errA, gradParametersG
 end
 
@@ -201,8 +207,8 @@ fGx = function(x)
     output = netD.output
     errG = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    df_dg = netD:updateGradInput(input_x, df_do)
-    if (errG > 0.7) then decoder:backward(noise_x, df_dg) end
+    df_dg = netD:updateGradInput(input_x, torch.mul(df_do, 0.1))
+    if (errG > 0.7) then decoder:backward(noise_x, torch.mul(df_dg, 0.001)) end
     gradParametersG:clamp(-5, 5)
     return errG, gradParametersG
 end
@@ -222,12 +228,12 @@ for epoch = 1, 50000 do
         local size = math.min(i + batch_size - 1, train_size) - i
         input_x = train:narrow(1, size, batch_size)
         tm:reset()
-
         optim.adam(fDx, parametersD, optimStateD)
         optim.adam(fAx, parametersG, optimStateG)
         optim.adam(fGx, parametersG, optimStateG)
         collectgarbage('collect')
     end
+    reconstruct_count = reconstruct_count + 1
     if errG then
       print("Generator loss: " .. errG .. ", Autoencoder loss: " .. errA .. ", Discriminator loss: " .. errD)
       else print("Discriminator loss: " .. errD)
