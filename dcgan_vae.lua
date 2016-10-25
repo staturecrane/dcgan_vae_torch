@@ -26,6 +26,7 @@ dataset_size = args.size
 checkpoints = args.checkpoints
 reconstruct_folder = args.reconstruction
 
+--ensure tensors are of correct type
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setnumthreads(1)
 
@@ -82,10 +83,10 @@ function weights_init(m)
    end
 end
 
-z_dim = 100
-ndf = 64
-ngf = 64
-naf = 64
+z_dim = 400
+ndf = 80
+ngf = 80
+naf = 80
 
 encoder = VAE.get_encoder(channels, naf, z_dim)
 sampler = VAE.get_sampler()
@@ -121,22 +122,26 @@ optimStateD = {
    beta1 = 0.5
 }
 
+--noise to pass through decoder to generate random samples from Z
 noise_x = torch.Tensor(batch_size, z_dim, 1, 1)
 noise_x = noise_x:cuda()
 noise_x:normal(0, 0.01)
-label = torch.Tensor(batch_size)
 
-dNoise = nn.WhiteNoise(0, 0.1):cuda()
+--label, real or fake, for our GAN
+label = torch.Tensor(batch_size)
 
 label = label:cuda()
 
 real_label = 1
 fake_label = 0
 
+dNoise = .1
+
 epoch_tm = torch.Timer()
 tm = torch.Timer()
 data_tm = torch.Timer()
 
+--to keep track of our reconstructions
 reconstruct_count = 1
 
 parametersD, gradParametersD = netD:getParameters()
@@ -146,15 +151,18 @@ errD = 0
 errG = 0
 errA = 0
 
-fDx = function(x)
 
+--training evaluation for discriminator.
+fDx = function(x)
     if x ~= parametersD then
         parametersD:copy(x)
     end
     gradParametersD:zero()
+
     -- train with real
     label:fill(real_label)
-    input_x = dNoise:forward(input_x)
+    --slightly noise inputs to help stabilize GAN and allow for convergence
+    input_x = nn.WhiteNoise(0, dNoise):cuda():forward(input_x)
     output = netD:forward(input_x)
     errD_real = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
@@ -175,6 +183,7 @@ fDx = function(x)
     return errD, gradParametersD
 end
 
+--training evaluation for variational autoencoder
 fAx = function(x)
     if x ~= parametersG then
         parametersG:copy(x)
@@ -198,6 +207,7 @@ fAx = function(x)
     return errA, gradParametersG
 end
 
+--training evaluation for generator
 fGx = function(x)
     if x ~= parametersG then
         parametersG:copy(x)
@@ -213,6 +223,7 @@ fGx = function(x)
     return errG, gradParametersG
 end
 
+--generate samples from Z
 generate = function(epoch)
     noise_x:normal(0, 0.01)
     local generations = decoder:forward(noise_x)
@@ -224,13 +235,16 @@ require 'cunn'
 
 for epoch = 1, 50000 do
     epoch_tm:reset()
+    --main training loop
     for i = 1, train_size, batch_size do
+        --split training data into mini-batches
         local size = math.min(i + batch_size - 1, train_size) - i
         input_x = train:narrow(1, size, batch_size)
         tm:reset()
-        optim.adam(fDx, parametersD, optimStateD)
-        optim.adam(fAx, parametersG, optimStateG)
-        optim.adam(fGx, parametersG, optimStateG)
+        --optim takes an evaluation function, the parameters of the model you wish to train, and the optimization options, such as learning rate and momentum
+        optim.adam(fDx, parametersD, optimStateD) --decoder
+        optim.adam(fAx, parametersG, optimStateG) --VAE
+        optim.adam(fGx, parametersG, optimStateG) --generator
         collectgarbage('collect')
     end
     reconstruct_count = reconstruct_count + 1
@@ -238,8 +252,10 @@ for epoch = 1, 50000 do
       print("Generator loss: " .. errG .. ", Autoencoder loss: " .. errA .. ", Discriminator loss: " .. errD)
       else print("Discriminator loss: " .. errD)
     end
+    --null to help with memory
     parametersD, gradParametersD = nil, nil
     parametersG, gradParametersG = nil, nil
+    --save and/or clear model state for next training batch
     if epoch % 1000 == 0 then
         torch.save(checkpoints .. epoch .. '_net_G.t7', netG:clearState())
         torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
@@ -251,6 +267,8 @@ for epoch = 1, 50000 do
     train = fillTensor(train)
     parametersD, gradParametersD = netD:getParameters()
     parametersG, gradParametersG = netG:getParameters()
+    --simulated annealing for the discriminator's noise parameter
+    if epoch % 10 == 0 then dNoise = dNoise * 0.99 end
     print(('End of epoch %d / %d \t Time Taken: %.3f'):format(
            epoch, 10000, epoch_tm:time().real))
 end
