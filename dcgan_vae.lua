@@ -11,7 +11,7 @@ hasCudnn, cudnn = pcall(require, 'cudnn')
 assert(hasCudnn)
 
 local argparse = require 'argparse'
-local parser = argparse('oneira-art', 'dream up images from your favorite artist')
+local parser = argparse('dcgan_vae', 'a Torch implementation of the deep convolutional generative adversarial network, with variational autoencoder')
 parser:option('-i --input', 'input directory for image dataset')
 parser:option('-o --output', 'output directory for generated images')
 parser:option('-s --size', 'size of dataset')
@@ -63,7 +63,8 @@ train = train:cuda()
 function fillTensor(tensor)
   filenames = getFilenames()
   for i = 1, train_size do
-    tensor[i] = image.load(input .. filenames[torch.random(1, dataset_size)])
+    local image_x = image.load(input .. filenames[torch.random(1, dataset_size)])
+      tensor[i] = image.crop(image_x, 'c', 128, 128)
   end
   return tensor
 end
@@ -135,7 +136,7 @@ label = label:cuda()
 real_label = 1
 fake_label = 0
 
-dNoise = .1
+dNoise = .25
 
 epoch_tm = torch.Timer()
 tm = torch.Timer()
@@ -166,7 +167,7 @@ fDx = function(x)
     output = netD:forward(input_x)
     errD_real = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    if (errD > 0.7 and errG < 0.7) then netD:backward(input_x, df_do) end
+    if (errD > 0.7 and errG < 1.0) then netD:backward(input_x, df_do) end
 
     -- train with fake
     noise_x:normal(0, 0.01)
@@ -176,7 +177,7 @@ fDx = function(x)
     output = netD:forward(fake)
     errD_fake = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    if (errD > 0.7 and errG < 0.7) then netD:backward(fake, df_do) end
+    if (errD > 0.7 and errG < 1.0) then netD:backward(fake, df_do) end
 
     errD = errD_real + errD_fake
     gradParametersD:clamp(-5, 5)
@@ -222,8 +223,8 @@ fGx = function(x)
     output = netD.output
     errG = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    df_dg = netD:updateGradInput(input_x, torch.mul(df_do, 0.1))
-    if (errG > 0.7) then decoder:backward(noise_x, torch.mul(df_dg, 0.001)) end
+    df_dg = netD:updateGradInput(input_x, df_do)
+    if (errG > 0.7 and errD < 1.0) then decoder:backward(noise_x, df_dg) end
     gradParametersG:clamp(-5, 5)
     return errG, gradParametersG
 end
