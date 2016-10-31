@@ -52,10 +52,11 @@ function getNumber(num)
   return filename
 end
 
-train_size = 50
-batch_size = 25
+
+train_size = 200
+batch_size = 50
 channels = 3
-dim = 256
+dim = 64
 
 train = torch.Tensor(train_size, channels, dim, dim)
 train = train:cuda()
@@ -71,13 +72,15 @@ function fillTensor(tensor)
     if flip_or_not == 1 then
         image_x = image.hflip(image_x)
     end
-    local image_ok, image_crop = pcall(image.crop, image_x, crop_formats[format_index], dim, dim)
-    if image_ok then
+    local image_ok, image_crop = pcall(image.crop, image_x, 'c', dim, dim)
+    --[[if image_ok then
         tensor[i] = image_crop
     else
         local image_scaled = image.scale(image_x, dim, dim)
         tensor[i] = image_scaled
-    end
+    end--]]
+    local image_scaled = image.scale(image_x, dim, dim)
+    tensor[i] = image_scaled
   end
   return tensor
 end
@@ -97,10 +100,10 @@ function weights_init(m)
    end
 end
 
-z_dim = 200
-ndf = 32
-ngf = 32
-naf = 32
+z_dim = 100
+ndf = 64
+ngf = 64
+naf = 64
 
 encoder = VAE.get_encoder(channels, naf, z_dim)
 sampler = VAE.get_sampler()
@@ -112,13 +115,13 @@ netG:add(sampler)
 netG:add(decoder)
 netG:apply(weights_init)
 
---netD = discriminator.get_discriminator(channels, ndf)
---netD:apply(weights_init)
+netD = discriminator.get_discriminator(channels, ndf)
+netD:apply(weights_init)
 
 netG = netG:cuda()
---netD = netD:cuda()
+netD = netD:cuda()
 cudnn.convert(netG, cudnn)
---cudnn.convert(netD, cudnn)
+cudnn.convert(netD, cudnn)
 
 criterion = nn.BCECriterion()
 criterion = criterion:cuda()
@@ -127,12 +130,12 @@ m_criterion = nn.MSECriterion()
 m_criterion = m_criterion:cuda()
 
 optimStateG = {
-   learningRate =  0.00001,
+   learningRate =  0.0002,
    beta1 = 0.5
 }
 
 optimStateD = {
-   learningRate = 0.00002,
+   learningRate = 0.0002,
    beta1 = 0.5
 }
 
@@ -149,7 +152,7 @@ label = label:cuda()
 real_label = 1
 fake_label = 0
 
-dNoise = .25
+dNoise = .1
 
 epoch_tm = torch.Timer()
 tm = torch.Timer()
@@ -158,7 +161,7 @@ data_tm = torch.Timer()
 --to keep track of our reconstructions
 reconstruct_count = 1
 
---parametersD, gradParametersD = netD:getParameters()
+parametersD, gradParametersD = netD:getParameters()
 parametersG, gradParametersG = netG:getParameters()
 
 errD = 0
@@ -180,7 +183,7 @@ fDx = function(x)
     output = netD:forward(input_x)
     errD_real = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    if (errD > 0.7 and errG < 1.0) then netD:backward(input_x, df_do) end
+    if (errG < .7 or errD > 1.0) then netD:backward(input_x, df_do) end
 
     -- train with fake
     noise_x:normal(0, 0.01)
@@ -190,7 +193,7 @@ fDx = function(x)
     output = netD:forward(fake)
     errD_fake = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
-    if (errD > 0.7 and errG < 1.0) then netD:backward(fake, df_do) end
+    if (errG < .7 or errD > 1.0) then netD:backward(fake, df_do) end
 
     errD = errD_real + errD_fake
     gradParametersD:clamp(-5, 5)
@@ -205,6 +208,7 @@ fAx = function(x)
     --reconstruction loss
     gradParametersG:zero()
     output = netG:forward(input_x)
+    --print(output:size(), input_x:size())
     errA = m_criterion:forward(output, input_x)
     df_do = m_criterion:backward(output, input_x)
     netG:backward(input_x, df_do)
@@ -237,7 +241,7 @@ fGx = function(x)
     errG = criterion:forward(output, label)
     df_do = criterion:backward(output, label)
     df_dg = netD:updateGradInput(input_x, df_do)
-    if (errG > 0.7 and errD < 1.0) then decoder:backward(noise_x, torch.mul(df_dg, 0.01)) end
+    if (errD < .7 or errG > 1.0) then decoder:backward(noise_x, df_dg) end
     gradParametersG:clamp(-5, 5)
     return errG, gradParametersG
 end
@@ -262,8 +266,8 @@ for epoch = 1, 50000 do
         tm:reset()
         --optim takes an evaluation function, the parameters of the model you wish to train, and the optimization options, such as learning rate and momentum
         optim.adam(fAx, parametersG, optimStateG)  --VAE
-        --optim.adam(fDx, parametersD, optimStateD) --decoder
-        --optim.adam(fGx, parametersG, optimStateG) --generator
+        optim.adam(fDx, parametersD, optimStateD) --decoder
+        optim.adam(fGx, parametersG, optimStateG) --generator
         collectgarbage('collect')
     end
     reconstruct_count = reconstruct_count + 1
@@ -280,11 +284,11 @@ for epoch = 1, 50000 do
         --torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
     else
         netG:clearState()
-        --netD:clearState()
+        netD:clearState()
     end
     generate(epoch)
     train = fillTensor(train)
-    --parametersD, gradParametersD = netD:getParameters()
+    parametersD, gradParametersD = netD:getParameters()
     parametersG, gradParametersG = netG:getParameters()
     --simulated annealing for the discriminator's noise parameter
     if epoch % 10 == 0 then dNoise = dNoise * 0.99 end
