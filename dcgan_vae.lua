@@ -260,7 +260,7 @@ for epoch = 1, 50000 do
         tm:reset()
         --optim takes an evaluation function, the parameters of the model you wish to train, and the optimization options, such as learning rate and momentum
         optim.adam(fAx, parametersG, optimStateG)  --VAE
-        optim.adam(fDx, parametersD, optimStateD) --decoder
+        optim.adam(fDx, parametersD, optimStateD) --discriminator
         optim.adam(fGx, parametersG, optimStateG) --generator
         collectgarbage('collect')
     end
