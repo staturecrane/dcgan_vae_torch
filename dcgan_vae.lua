@@ -8,7 +8,7 @@ local VAE = require 'VAE'
 local discriminator = require 'discriminator'
 
 hasCudnn, cudnn = pcall(require, 'cudnn')
-assert(hasCudnn)
+assert(hasCudnn) --check to make sure you have CUDA and CUDNN-enabled GPU 
 
 local argparse = require 'argparse'
 local parser = argparse('dcgan_vae', 'a Torch implementation of the deep convolutional generative adversarial network, with variational autoencoder')
@@ -52,7 +52,6 @@ function getNumber(num)
   return filename
 end
 
-
 train_size = 200
 batch_size = 50
 channels = 3
@@ -61,26 +60,20 @@ dim = 64
 train = torch.Tensor(train_size, channels, dim, dim)
 train = train:cuda()
 
-crop_formats = {'c', 'tl', 'tr', 'bl', 'br'}
-
 function fillTensor(tensor)
   filenames = getFilenames()
   for i = 1, train_size do
     local image_x = image.load(input .. filenames[torch.random(1, dataset_size)])
-    local format_index = torch.random(1, #crop_formats)
     local flip_or_not = torch.random(1, 2)
     if flip_or_not == 1 then
         image_x = image.hflip(image_x)
     end
     local image_ok, image_crop = pcall(image.crop, image_x, 'c', dim, dim)
-    --[[if image_ok then
+    if image_ok then 
         tensor[i] = image_crop
     else
-        local image_scaled = image.scale(image_x, dim, dim)
-        tensor[i] = image_scaled
-    end--]]
-    local image_scaled = image.scale(image_x, dim, dim)
-    tensor[i] = image_scaled
+        print('image  cannot be cropped to ' .. dim .. 'x' .. dim .. '. Skipping...')
+    end
   end
   return tensor
 end
@@ -89,6 +82,7 @@ train = fillTensor(train)
 
 feature_size = channels * dim * dim
 
+--initialize the weights to non-zero 
 function weights_init(m)
    local name = torch.type(m)
    if name:find('Convolution') then
@@ -275,13 +269,12 @@ for epoch = 1, 50000 do
       print("Generator loss: " .. errG .. ", Autoencoder loss: " .. errA .. ", Discriminator loss: " .. errD)
       else print("Discriminator loss: " .. errD)
     end
-    --null to help with memory
-    --parametersD, gradParametersD = nil, nil
+    parametersD, gradParametersD = nil, nil
     parametersG, gradParametersG = nil, nil
     --save and/or clear model state for next training batch
     if epoch % 1000 == 0 then
         torch.save(checkpoints .. epoch .. '_net_G.t7', netG:clearState())
-        --torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
+        torch.save(checkpoints .. epoch .. '_net_D.t7', netD:clearState())
     else
         netG:clearState()
         netD:clearState()
