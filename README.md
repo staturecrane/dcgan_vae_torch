@@ -1,9 +1,11 @@
 
 # Deep Convolutional Variational Autoencoder w/ Adversarial Network
 
-A combination of the [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the[variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin. Also used is the [KLD criterion](https://github.com/y0ast/VAE-Torch) by y0ast. Currently, the model is set up to upsample and downsample 128x128 color images; the code can, however, be easily modified to accept any number of different dimensions or color channel combinations. I may modify the script to allow for this to be automated, depending on the level of interest.  
+A combination of the [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the[variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin. Also used is the [KLD criterion](https://github.com/y0ast/VAE-Torch) by y0ast. Currently, the model is set up to produce 64x64 images of inputs of any size via center cropping. You can modify the code relatively easily to produce different sized outputs, as well as to rescale images instead of cropping them. 
 
-I have added white noise to the original inputs that go through the discriminator after reading this [post on stabilizing GANS](http://www.inference.vc/instance-noise-a-trick-for-stabilising-gan-training/). Will post examples from training soon. 
+I have added white noise to the original inputs that go through the discriminator after reading this [post on stabilizing GANS](http://www.inference.vc/instance-noise-a-trick-for-stabilising-gan-training/). 
+
+#Results on Wikimedia Paintings Dataset
 
 ## Prerequisites 
 1. Torch7
