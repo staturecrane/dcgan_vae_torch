@@ -1,7 +1,9 @@
 
 # Deep Convolutional Variational Autoencoder w/ Generative Adversarial Network
 
-A combination of the [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the [variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin. Also used is the [KLD criterion](https://github.com/y0ast/VAE-Torch) by y0ast. Currently, the model is set up to produce 64x64 images from inputs of any size via center cropping. You can modify the code relatively easily to produce different sized outputs (adding more convolutional layers or using other tricks), as well as to rescale images instead of cropping them. Images are flipped horizontally 50% of the time. 
+A combination of the [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the [variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin.  
+
+The model produces 64x64 images from inputs of any size via center cropping. You can modify the code relatively easily to produce different sized outputs (adding more convolutional layers, for instance), as well as to rescale images instead of cropping them. Images are randomly flipped horizontally to get better coverage on training data. 
 
 I have added white noise to the original inputs that go through the discriminator after reading this [post on stabilizing GANS](http://www.inference.vc/instance-noise-a-trick-for-stabilising-gan-training/). The noise level is annealed over time to help the generator and discriminator converge. 
 
@@ -18,7 +20,7 @@ I have added white noise to the original inputs that go through the discriminato
 6. optim
 7. xlua
 
-To run, simply execute the script using 
+To run, execute the script using 
 
 ``` 
 th dcgan_vae.lua -i [input folder destination] -o [output folder destination] -s [size of dataset (number of image files)] -c [destination for saving model checkpoints] -r [reconstructions folder]
