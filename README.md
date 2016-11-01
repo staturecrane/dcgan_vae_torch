@@ -1,5 +1,5 @@
 
-# Deep Convolutional Variational Autoencoder w/ Adversarial Network
+# Deep Convolutional Variational Autoencoder w/ Generative Adversarial Network
 
 A combination of the [DCGAN implementation](https://github.com/soumith/dcgan.torch) by soumith and the [variational autoencoder](https://github.com/Kaixhin/Autoencoders) by Kaixhin. Also used is the [KLD criterion](https://github.com/y0ast/VAE-Torch) by y0ast. Currently, the model is set up to produce 64x64 images of inputs of any size via center cropping. You can modify the code relatively easily to produce different sized outputs, as well as to rescale images instead of cropping them. 
 
