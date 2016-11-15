@@ -14,7 +14,6 @@ local argparse = require 'argparse'
 local parser = argparse('dcgan_vae', 'a Torch implementation of the deep convolutional generative adversarial network, with variational autoencoder')
 parser:option('-i --input', 'input directory for image dataset')
 parser:option('-o --output', 'output directory for generated images')
-parser:option('-s --size', 'size of dataset')
 parser:option('-c --checkpoints', 'directory for saving checkpoints')
 parser:option('-r --reconstruction', 'directory to put samples of reconstructions')
 
@@ -22,7 +21,6 @@ args = parser:parse()
 
 input = args.input
 output_folder = args.output
-dataset_size = args.size
 checkpoints = args.checkpoints
 reconstruct_folder = args.reconstruction
 
@@ -60,10 +58,11 @@ dim = 64
 train = torch.Tensor(train_size, channels, dim, dim)
 train = train:cuda()
 
+filenames = getFilenames()
+
 function fillTensor(tensor)
-  filenames = getFilenames()
   for i = 1, train_size do
-    local image_x = image.load(input .. filenames[torch.random(1, dataset_size)])
+    local image_x = image.load(input .. filenames[torch.random(1, #filenames)])
     local flip_or_not = torch.random(1, 2)
     if flip_or_not == 1 then
         image_x = image.hflip(image_x)
