@@ -7,7 +7,7 @@ The model produces 64x64 images from inputs of any size via center cropping. You
 
 I have added white noise to the original inputs that go through the discriminator after reading this [post on stabilizing GANS](http://www.inference.vc/instance-noise-a-trick-for-stabilising-gan-training/). The noise level is annealed over time to help the generator and discriminator converge. 
 
-#Results on Wikimedia Paintings Dataset
+# Results on Wikimedia Paintings Dataset
 
 ![](https://github.com/staturecrane/dcgan_vae_torch/blob/master/tiled_images.png)
 
